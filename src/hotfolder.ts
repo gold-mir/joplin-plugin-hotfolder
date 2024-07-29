@@ -8,7 +8,6 @@ import { settings } from "./settings";
 import { I18n } from "i18n";
 import hotfolderLogging from "electron-log";
 import { hotfolderSettings, processFile } from "./type";
-import isSvg from "is-svg";
 
 const fs = require("fs-extra");
 
@@ -392,23 +391,8 @@ class Hotfolder {
       newBody = "[" + fileName + "](:/" + resource.id + ")";
       if (mimeType !== undefined && mimeType.mime.split("/")[0] === "image") {
         newBody = "!" + newBody;
-        //svg files should be recognized as xmlapplication/xml, if they have .svg extension do additional check
-      } else if (
-        mimeType !== undefined &&
-        mimeType.mime.split("/")[1] === "xml" &&
-        ext === ".svg"
-      ) {
-        let fileBuffer = null;
-        try {
-          fileBuffer = fs.readFileSync(file);
-        } catch (e) {
-          this.log.error("Error on readFileSync");
-          this.log.error(e);
-        }
-        let fileBufferString = fileBuffer.toString();
-        if (isSvg(fileBufferString)) {
-          newBody = "!" + newBody;
-        }
+      } else if (ext === ".svg") {
+        newBody = "!" + newBody;
       }
 
       return await joplin.data.post(["notes"], null, {
