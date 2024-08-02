@@ -214,7 +214,7 @@ class Hotfolder {
         const watcher = chokidar.watch(hotfolderPath, {
           persistent: true,
           alwaysStat: true,
-          depth: 0,
+          depth: 1,
           usePolling: hotfolderSettings.usePolling,
           interval: hotfolderSettings.pollingIntervall,
           binaryInterval: hotfolderSettings.pollingIntervall * 2,
@@ -256,16 +256,20 @@ class Hotfolder {
           .on("error", async (error) => {
             this.log.error(`${hotfolderLogName}: Watcher error: ${error}`);
           })
-          .on("add", async (path, stats) => {
+          .on("add", async (newPath, stats) => {
             this.log.info(
-              `${hotfolderLogName}: File "${path}" (${stats.size}) has been added`
+              `${hotfolderLogName}: File "${newPath}" (${stats.size}) has been added`
             );
+            let relative = path.relative(hotfolderPath, path.dirname(newPath));
+            let subFolder = relative ? relative.replace(/[\\\/]+$/, "") : null;
+            this.log.verbose(`subFolder: ${subFolder}`);
 
             this.processFile({
-              path: path,
+              path: newPath,
               hotfolderNr: hotfolderNr,
               prevStat: null,
               reCheck: null,
+              folder: subFolder || null,
             });
           });
         this.log.verbose(`${hotfolderLogName}: Add chokidar`);
@@ -302,7 +306,23 @@ class Hotfolder {
         let newNote = null;
         let noteTitle = fileName.replace(fileExt, "");
 
-        if (
+        let notebookId = hotfolderSettings.notebookId;
+
+        if (processFile.folder) {
+          if (
+            (await helper.checkNotebookExist(processFile.folder.trim())) ===
+            false
+          ) {
+            this.log.verbose("creating notebook");
+            await joplin.data.post(["folders"], null, {
+              title: processFile.folder.trim(),
+            });
+          }
+          notebookId = await helper.getNotebookId(
+            processFile.folder.trim(),
+            false
+          );
+        } else if (
           hotfolderSettings.importNotebook.trim() !== "" &&
           (await helper.checkNotebookExist(
             hotfolderSettings.importNotebook.trim()
@@ -317,6 +337,8 @@ class Hotfolder {
           );
         }
 
+        this.log.verbose(`notebookId: ${notebookId}`);
+
         if (
           hotfolderSettings.extensionsAddAsText
             .split(/\s*,\s*/)
@@ -326,7 +348,7 @@ class Hotfolder {
           newNote = await this.importAsText(
             processFile.path,
             noteTitle,
-            hotfolderSettings.notebookId,
+            notebookId,
             hotfolderSettings.textAsTodo
           );
         } else {
@@ -334,7 +356,7 @@ class Hotfolder {
           newNote = await this.importAsAttachment(
             processFile.path,
             noteTitle,
-            hotfolderSettings.notebookId
+            notebookId
           );
         }
 

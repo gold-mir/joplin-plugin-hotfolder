@@ -3,6 +3,7 @@ interface processFile {
   hotfolderNr: number;
   prevStat: any;
   reCheck: number;
+  folder?: string;
 }
 interface hotfolderSettings {
   notebookId: string;
